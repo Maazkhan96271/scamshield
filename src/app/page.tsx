@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PwaProviders from "@/components/PwaProviders";
 
 function ShieldLogo({ className = "h-7 w-7" }: { className?: string }) {
   return (
@@ -10,15 +11,6 @@ function ShieldLogo({ className = "h-7 w-7" }: { className?: string }) {
         strokeLinejoin="round"
       />
       <path d="m8.7 12.1 2.3 2.3 4.3-4.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" className="mt-0.5 h-4 w-4 shrink-0 text-safe" aria-hidden>
-      <circle cx="10" cy="10" r="8.25" stroke="currentColor" strokeWidth="1.5" />
-      <path d="m6.5 10.2 2.2 2.2 4.6-4.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -94,12 +86,15 @@ export default function Home() {
             <a href="#verdicts" className="transition-colors hover:text-foreground">Verdicts</a>
             <Link href="/history" className="transition-colors hover:text-foreground">History</Link>
           </div>
-          <Link
-            href="/analyze"
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-background transition hover:bg-accent-strong"
-          >
-            Analyze a message
-          </Link>
+          <div className="flex items-center gap-3">
+            <PwaProviders />
+            <Link
+              href="/analyze"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-background transition hover:bg-accent-strong"
+            >
+              Analyze a message
+            </Link>
+          </div>
         </nav>
       </header>
 

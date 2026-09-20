@@ -307,6 +307,14 @@ const GENERAL_RULES: Rule[] = [
     title: "Excessive punctuation",
     inference: "Strings of exclamation marks ('!!!') are used to fake excitement or urgency.",
   },
+  // Unusual sender information (spoofed sender IDs / long odd numbers)
+  {
+    category: "authority",
+    weight: 10,
+    pattern: /\b(?:from|sender)\s*[:\uFF1A]\s*([A-Z]{1,3}-[A-Z0-9]{2,8}|\+?\d[\d -]{8,14}\d)\b/i,
+    title: "Unusual sender ID",
+    inference: "Alphanumeric-hyphen sender IDs or long odd numbers are commonly spoofed in smishing campaigns.",
+  },
 ];
 
 const RULES: Rule[] = [...URGENCY_RULES, ...SENSITIVE_INFO_RULES, ...PAYMENT_RULES, ...GENERAL_RULES];
@@ -347,15 +355,6 @@ function extractLinks(text: string): string[] {
   for (const m of text.match(URL_REGEX) ?? []) push(m);
   for (const m of text.match(BARE_DOMAIN_REGEX) ?? []) push(m);
   return found.slice(0, 10);
-}
-
-function hostnameOf(url: string): string {
-  try {
-    const withProto = url.startsWith("http") ? url : `http://${url}`;
-    return new URL(withProto).hostname.toLowerCase();
-  } catch {
-    return "";
-  }
 }
 
 /** Parses a single URL with `new URL()` and returns shape-based indicators. */

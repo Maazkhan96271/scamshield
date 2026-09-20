@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   confidenceBand,
@@ -17,6 +17,7 @@ import {
   type SignalSeverity,
 } from "@/lib/scam";
 import { addHistory } from "@/lib/history";
+import QrChecker from "@/components/QrChecker";
 
 const RISK_EMOJI: Record<RiskLevel, string> = {
   HIGH: "🚨",
@@ -229,6 +230,40 @@ export default function AnalyzePage() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  /** Compact, human-readable summary of a verdict for the clipboard / share sheet. */
+  function verdictSummary(r: AnalysisResult): string {
+    const lines = [
+      `ScamShield verdict: ${r.risk_level} risk`,
+      `${r.signals.length} risk indicator${r.signals.length === 1 ? "" : "s"} detected`,
+    ];
+    if (r.claimed_organization) lines.push(`Claims to be from: ${r.claimed_organization}`);
+    if (r.extracted_urls.length > 0) lines.push(`Links found: ${r.extracted_urls.slice(0, 3).join(", ")}`);
+    lines.push(r.explanation);
+    lines.push("— analyzed with ScamShield (guidance, not certainty)");
+    return lines.join("\n");
+  }
+
+  async function shareVerdict() {
+    if (!result) return;
+    const text = verdictSummary(result);
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "ScamShield verdict", text });
+        return;
+      } catch {
+        /* user dismissed — fall through to clipboard */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable — ignore */
+    }
+  }
 
   const chars = content.length;
   const overLimit = chars > MAX_CONTENT_LENGTH;
@@ -242,6 +277,31 @@ export default function AnalyzePage() {
     setError(null);
     setScannedText("");
   }
+
+  /** Content shared into ScamShield from another app (PWA share target) pre-fills and auto-scans. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const sharedText = params.get("text");
+    const sharedUrl = params.get("url");
+    // Deferred so the effect body itself never sets state synchronously.
+    const t = window.setTimeout(() => {
+      if (sharedText) {
+        setContent(sharedText.slice(0, MAX_CONTENT_LENGTH));
+        setKind("sms");
+        setActiveMode("text");
+        setScannedText(sharedText.slice(0, MAX_CONTENT_LENGTH));
+        void runScan("text", sharedText.slice(0, MAX_CONTENT_LENGTH));
+        window.history.replaceState(null, "", "/analyze");
+      } else if (sharedUrl) {
+        setUrlInput(sharedUrl);
+        void runScan("url", undefined, sharedUrl);
+        window.history.replaceState(null, "", "/analyze");
+      }
+    }, 0);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleFile(file: File) {
     setError(null);
@@ -261,12 +321,14 @@ export default function AnalyzePage() {
     reader.readAsDataURL(file);
   }
 
-  async function runScan(mode: AnalysisMode) {
+  async function runScan(mode: AnalysisMode, overrideText?: string, overrideUrl?: string) {
     if (loading) return;
+    const text = overrideText ?? content;
+    const url = overrideUrl ?? urlInput;
     if (mode === "text") {
-      if (!content.trim() || overLimit) return;
+      if (!text.trim() || text.length > MAX_CONTENT_LENGTH) return;
     } else if (mode === "url") {
-      if (!urlInput.trim()) return;
+      if (!url.trim()) return;
     } else if (!image) {
       return;
     }
@@ -278,9 +340,9 @@ export default function AnalyzePage() {
     try {
       const payload =
         mode === "text"
-          ? { mode: "text", content, kind }
+          ? { mode: "text", content: text, kind }
           : mode === "url"
-            ? { mode: "url", url: urlInput.trim() }
+            ? { mode: "url", url: url.trim() }
             : { mode: "image", imageDataUrl: image!.dataUrl };
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -290,19 +352,14 @@ export default function AnalyzePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(typeof data?.error === "string" ? data.error : "Analysis failed");
       const result = data as AnalysisResult;
-      setScannedText(mode === "text" ? content : mode === "url" ? urlInput.trim() : "");
+      setScannedText(mode === "text" ? text : mode === "url" ? url.trim() : "");
       setResult(result);
       // Archive the scan in the encrypted on-device history (best effort).
       void addHistory({
         mode,
         kind: mode === "text" ? kind : undefined,
-        preview:
-          mode === "text"
-            ? content
-            : mode === "url"
-              ? urlInput.trim()
-              : "Screenshot scan",
-        url: mode === "url" ? urlInput.trim() : undefined,
+        preview: mode === "text" ? text : mode === "url" ? url.trim() : "Screenshot scan",
+        url: mode === "url" ? url.trim() : undefined,
         result,
       }).catch(() => undefined);
     } catch (e) {
@@ -404,7 +461,22 @@ export default function AnalyzePage() {
             <ScanButton label="🔍 Analyze" onClick={() => runScan("text")} disabled={loading || !content.trim() || overLimit} />
           </div>
 
-          {/* 2. URL */}
+          {/* 2. QR code */}
+          <QrChecker
+            loading={loading}
+            onAnalyze={(mode, decoded) => {
+              if (mode === "url") {
+                setUrlInput(decoded);
+                void runScan("url", undefined, decoded);
+              } else {
+                setKind("sms");
+                setContent(decoded);
+                void runScan("text", decoded);
+              }
+            }}
+          />
+
+          {/* 3. URL */}
           <div className="panel rounded-2xl p-5 sm:p-6">
             <h2 className="text-lg font-medium">
               Link check
@@ -578,6 +650,14 @@ export default function AnalyzePage() {
                     >
                       {RISK_STYLES[result.risk_level].label}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => void shareVerdict()}
+                      className="rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-muted transition hover:border-accent/40 hover:text-accent"
+                      title="Copy or share this verdict"
+                    >
+                      {copied ? "✓ Copied" : "Share"}
+                    </button>
                   </div>
                 </div>
                 <p className="mt-3 font-mono text-xs text-muted">

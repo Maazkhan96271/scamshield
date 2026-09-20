@@ -1,0 +1,42 @@
+{
+  "name": "ScamShield — Analyze suspicious messages before you act",
+  "short_name": "ScamShield",
+  "description": "AI-assisted scam risk analysis for emails, SMS, WhatsApp messages and payment requests. Flags risk (HIGH/MEDIUM/LOW), explains why, and recommends safe next steps.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#05080f",
+  "theme_color": "#05080f",
+  "categories": ["utilities", "security", "productivity"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/maskable-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "New scan",
+      "short_name": "Scan",
+      "url": "/analyze",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Scan history",
+      "short_name": "History",
+      "url": "/history",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -16,6 +16,26 @@ export const metadata: Metadata = {
   title: "ScamShield — Analyze suspicious messages before you act",
   description:
     "AI-assisted scam risk analysis for emails, SMS, WhatsApp messages and payment requests. Flags risk (HIGH/MEDIUM/LOW), explains why, and recommends safe next steps — without ever claiming certainty.",
+  manifest: "/manifest.webmanifest",
+  applicationName: "ScamShield",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "ScamShield",
+  },
+  formatDetection: { telephone: false },
+  openGraph: {
+    title: "ScamShield — Analyze suspicious messages before you act",
+    description:
+      "Paste a suspicious message, link or screenshot. Get red flags, honest risk levels, and safe next steps — free, no sign-up.",
+    type: "website",
+    siteName: "ScamShield",
+  },
+  twitter: {
+    card: "summary",
+    title: "ScamShield — Analyze suspicious messages before you act",
+    description: "Paste a suspicious message, link or screenshot. Get red flags and safe next steps.",
+  },
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },
@@ -24,6 +44,12 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#05080f",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
