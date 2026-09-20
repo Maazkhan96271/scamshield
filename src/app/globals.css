@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+:root {
+  --background: #05080f;
+  --foreground: #e7eef7;
+  --surface: #0b1220;
+  --surface-2: #101a2c;
+  --line: #1c2942;
+  --muted: #8aa0b8;
+  --accent: #2dd4bf;
+  --accent-strong: #0ea5a0;
+  --danger: #f43f5e;
+  --warn: #f59e0b;
+  --safe: #34d399;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-danger: var(--danger);
+  --color-warn: var(--warn);
+  --color-safe: var(--safe);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background:
+    radial-gradient(1100px 600px at 85% -10%, rgba(45, 212, 191, 0.09), transparent 60%),
+    radial-gradient(900px 550px at -10% 15%, rgba(59, 130, 246, 0.08), transparent 55%),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+::selection {
+  background: rgba(45, 212, 191, 0.28);
+}
+
+/* Subtle engineering grid for hero/section backdrops */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(148, 178, 209, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 178, 209, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, black 30%, transparent 75%);
+}
+
+/* Glassy panel used across cards */
+.panel {
+  background: linear-gradient(180deg, rgba(16, 26, 44, 0.85), rgba(11, 18, 32, 0.92));
+  border: 1px solid var(--line);
+  backdrop-filter: blur(6px);
+}
+
+.panel-glow {
+  box-shadow:
+    0 0 0 1px rgba(45, 212, 191, 0.06),
+    0 24px 60px -24px rgba(0, 0, 0, 0.8),
+    0 0 90px -30px rgba(45, 212, 191, 0.25);
+}
+
+/* Animated scanning line (hero card + analyzing state) */
+@keyframes scan-y {
+  0% { top: 4%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { top: 94%; opacity: 0; }
+}
+
+.scanline {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  height: 2px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  filter: drop-shadow(0 0 6px rgba(45, 212, 191, 0.8));
+  animation: scan-y 2.6s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.82); }
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.rise-in {
+  animation: rise-in 0.5s ease-out both;
+}
+
+/* Slim dark scrollbars for result panes */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #223250 transparent;
+}
