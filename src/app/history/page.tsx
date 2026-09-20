@@ -10,7 +10,8 @@ import {
   type RiskLevel,
   type SignalSeverity,
 } from "@/lib/scam";
-import { clearHistory, deleteHistoryEntry, getHistory, HISTORY_LIMIT, type HistoryEntry } from "@/lib/history";
+import { clearHistory, deleteHistoryEntry, getHistory, mergeHistory, HISTORY_LIMIT, type HistoryEntry } from "@/lib/history";
+import { exportBackup, importBackup } from "@/lib/history-backup";
 
 const RISK_EMOJI: Record<RiskLevel, string> = { HIGH: "🚨", MEDIUM: "⚠️", LOW: "✅" };
 
@@ -77,6 +78,9 @@ function formatWhen(at: number): string {
 export default function HistoryPage() {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [backupOpen] = useState(true);
+  const [passphrase, setPassphrase] = useState("");
+  const [backupMsg, setBackupMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -97,6 +101,35 @@ export default function HistoryPage() {
   async function handleDelete(id: string) {
     await deleteHistoryEntry(id);
     setEntries((prev) => (prev ? prev.filter((e) => e.id !== id) : prev));
+  }
+
+  async function handleExport() {
+    if (!entries || entries.length === 0) return;
+    try {
+      const backup = await exportBackup(entries, passphrase);
+      const blob = new Blob([backup], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `scamshield-history-${new Date().toISOString().slice(0, 10)}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setBackupMsg({ kind: "ok", text: "Backup downloaded. Keep the passphrase safe — it can't be recovered." });
+    } catch (e) {
+      setBackupMsg({ kind: "err", text: e instanceof Error ? e.message : "Export failed." });
+    }
+  }
+
+  async function handleImport(file: File) {
+    try {
+      const text = await file.text();
+      const restored = await importBackup(text, passphrase);
+      const merged = await mergeHistory(restored);
+      setEntries(merged);
+      setBackupMsg({ kind: "ok", text: `Restored ${restored.length} entr${restored.length === 1 ? "y" : "ies"}.` });
+    } catch (e) {
+      setBackupMsg({ kind: "err", text: e instanceof Error ? e.message : "Import failed." });
+    }
   }
 
   return (
@@ -162,6 +195,55 @@ export default function HistoryPage() {
             </div>
           )}
         </div>
+
+        {backupOpen && (
+          <div className="panel mt-4 rounded-2xl border-accent/25 p-5">
+            <h2 className="font-medium">Encrypted backup</h2>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              Export your history as a passphrase-encrypted file (PBKDF2 + AES-256-GCM). The passphrase
+              never leaves this device and cannot be recovered — if you lose it, the backup is unreadable.
+            </p>
+            <input
+              type="password"
+              value={passphrase}
+              onChange={(e) => setPassphrase(e.target.value)}
+              placeholder="Passphrase (min 8 characters)"
+              className="mt-3 w-full max-w-md rounded-xl border border-line bg-background/60 px-4 py-2.5 text-sm text-foreground placeholder:text-muted/60 focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/40"
+            />
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleExport()}
+                disabled={passphrase.length < 8 || !entries || entries.length === 0}
+                className="inline-flex h-10 items-center rounded-lg bg-accent px-4 text-sm font-semibold text-background transition hover:bg-accent-strong disabled:opacity-40"
+              >
+                Download encrypted backup
+              </button>
+              <label className="inline-flex h-10 cursor-pointer items-center rounded-lg border border-line px-4 text-sm text-muted transition hover:border-accent/40 hover:text-accent">
+                Restore from file
+                <input
+                  type="file"
+                  accept=".txt"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void handleImport(file);
+                  }}
+                />
+              </label>
+            </div>
+            {backupMsg && (
+              <p
+                role="status"
+                className={`mt-3 rounded-lg border p-3 text-sm ${
+                  backupMsg.kind === "ok" ? "border-safe/40 bg-safe/10 text-safe" : "border-danger/40 bg-danger/10 text-danger"
+                }`}
+              >
+                {backupMsg.text}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="mt-8">
           {entries === null && (

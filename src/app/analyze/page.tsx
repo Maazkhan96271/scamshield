@@ -18,6 +18,7 @@ import {
 } from "@/lib/scam";
 import { addHistory } from "@/lib/history";
 import QrChecker from "@/components/QrChecker";
+import EmailHeaderChecker from "@/components/EmailHeaderChecker";
 
 const RISK_EMOJI: Record<RiskLevel, string> = {
   HIGH: "🚨",
@@ -476,7 +477,10 @@ export default function AnalyzePage() {
             }}
           />
 
-          {/* 3. URL */}
+          {/* 3b. Email headers */}
+          <EmailHeaderChecker />
+
+          {/* 4. URL */}
           <div className="panel rounded-2xl p-5 sm:p-6">
             <h2 className="text-lg font-medium">
               Link check
@@ -759,6 +763,11 @@ export default function AnalyzePage() {
                 </div>
               )}
 
+              {/* Community report */}
+              {result.extracted_urls.length > 0 && (
+                <CommunityReportCard urls={result.extracted_urls} phones={extractPhones(scannedText)} />
+              )}
+
               {/* Recommendations */}
               <div className="panel rounded-2xl border-accent/25 p-5 sm:p-6">
                 <h2 className="font-medium text-accent">🛡️ What you should do</h2>
@@ -788,4 +797,119 @@ export default function AnalyzePage() {
 
 function kindLabel(kind: MessageKind): string {
   return MESSAGE_KINDS.find((k) => k.value === kind)?.label ?? "Email";
+}
+
+/** Phone-number-looking tokens from the analyzed text (for community reporting). */
+function extractPhones(text: string): string[] {
+  return [...new Set((text.match(/(?:\+?\d[\d\s-]{7,}\d)/g) ?? []).map((p) => p.trim()))].slice(0, 3);
+}
+
+/**
+ * Community scam-report block — shows crowd-sourced report counts for the
+ * links/numbers in this scan and lets the user file a report (scam or legit).
+ * Only the domain/number and the verdict word are sent — no message content.
+ */
+function CommunityReportCard({ urls, phones }: { urls: string[]; phones: string[] }) {
+  const targets = useMemo(() => {
+    const list: { kind: "domain" | "phone"; value: string }[] = [];
+    for (const raw of urls.slice(0, 3)) {
+      try {
+        const host = new URL(raw.startsWith("http") ? raw : `http://${raw}`).hostname;
+        if (host) list.push({ kind: "domain", value: host });
+      } catch {
+        /* ignore malformed links */
+      }
+    }
+    for (const p of phones) list.push({ kind: "phone", value: p });
+    return list.slice(0, 4);
+  }, [urls, phones]);
+
+  const [stats, setStats] = useState<Record<string, { reports: number } | null>>({});
+  const [sent, setSent] = useState<Record<string, "scam" | "legit">>({});
+
+  useEffect(() => {
+    let alive = true;
+    for (const t of targets) {
+      const key = `${t.kind}:${t.value}`;
+      fetch(`/api/community?target=${t.kind}&value=${encodeURIComponent(t.value)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (alive) setStats((prev) => ({ ...prev, [key]: data }));
+        })
+        .catch(() => {
+          if (alive) setStats((prev) => ({ ...prev, [key]: null }));
+        });
+    }
+    return () => {
+      alive = false;
+    };
+  }, [targets]);
+
+  async function report(t: { kind: "domain" | "phone"; value: string }, verdict: "scam" | "legit") {
+    const key = `${t.kind}:${t.value}`;
+    setSent((prev) => ({ ...prev, [key]: verdict }));
+    try {
+      const r = await fetch("/api/community/report", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ target: t.kind, value: t.value, verdict }),
+      });
+      const data = r.ok ? await r.json() : null;
+      setStats((prev) => ({ ...prev, [key]: data }));
+    } catch {
+      /* keep optimistic state */
+    }
+  }
+
+  if (targets.length === 0) return null;
+
+  return (
+    <div className="panel rounded-2xl p-5 sm:p-6">
+      <h2 className="font-medium">🧭 Community reports</h2>
+      <p className="mt-1 text-xs text-muted">
+        Crowd-sourced flags for the targets in this scan. Reports contain only the domain/number and a
+        verdict word — never your message. Community signals are hints, not proof.
+      </p>
+      <ul className="mt-4 space-y-3">
+        {targets.map((t) => {
+          const key = `${t.kind}:${t.value}`;
+          const s = stats[key];
+          const voted = sent[key];
+          return (
+            <li key={key} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line/70 bg-background/50 px-3.5 py-3">
+              <div className="min-w-0">
+                <p className="break-all font-mono text-xs text-foreground/85">{t.value}</p>
+                <p className="mt-0.5 text-[11px] text-muted">
+                  {s ? `${s.reports} report${s.reports === 1 ? "" : "s"} filed` : "no community reports yet"}
+                  {s && s.reports >= 3 ? " · commonly reported as a scam" : ""}
+                </p>
+              </div>
+              {voted ? (
+                <span className="rounded-md border border-safe/40 bg-safe/10 px-2.5 py-1 text-[11px] font-medium text-safe">
+                  ✓ reported
+                </span>
+              ) : (
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => void report(t, "scam")}
+                    className="rounded-md border border-danger/40 bg-danger/5 px-2.5 py-1 text-[11px] font-medium text-danger transition hover:bg-danger/15"
+                  >
+                    🚩 Report scam
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void report(t, "legit")}
+                    className="rounded-md border border-line px-2.5 py-1 text-[11px] text-muted transition hover:border-safe/40 hover:text-safe"
+                  >
+                    Mark legit
+                  </button>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }

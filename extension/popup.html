@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ScamShield</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        width: 380px;
+        max-height: 560px;
+        overflow-y: auto;
+        font: 13px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: #05080f;
+        color: #e6edf3;
+        padding: 14px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .shield {
+        width: 28px;
+        height: 28px;
+        border-radius: 7px;
+        background: #0a1220;
+        border: 1px solid #2dd4bf55;
+        display: grid;
+        place-items: center;
+        color: #2dd4bf;
+        font-size: 15px;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      h1 span {
+        color: #2dd4bf;
+      }
+      textarea {
+        width: 100%;
+        height: 88px;
+        resize: vertical;
+        border-radius: 10px;
+        border: 1px solid #1e2a3a;
+        background: #0a1220;
+        color: inherit;
+        padding: 9px 11px;
+        font: inherit;
+      }
+      textarea:focus {
+        outline: none;
+        border-color: #2dd4bf66;
+        box-shadow: 0 0 0 2px #2dd4bf22;
+      }
+      button {
+        cursor: pointer;
+        border: 0;
+        border-radius: 8px;
+        font-weight: 600;
+        font-family: inherit;
+      }
+      .analyze {
+        width: 100%;
+        margin-top: 9px;
+        padding: 9px 0;
+        background: #2dd4bf;
+        color: #05080f;
+        font-size: 13px;
+      }
+      .analyze:hover {
+        background: #3ce0cd;
+      }
+      .grab {
+        margin-top: 8px;
+        width: 100%;
+        padding: 7px 0;
+        background: transparent;
+        border: 1px solid #1e2a3a;
+        color: #8b98a9;
+        font-weight: 500;
+        font-size: 12px;
+      }
+      .grab:hover {
+        border-color: #2dd4bf55;
+        color: #2dd4bf;
+      }
+      .verdict {
+        margin-top: 13px;
+        border-radius: 12px;
+        padding: 12px;
+        border: 1px solid #1e2a3a;
+        background: #0a1220;
+      }
+      .risk {
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .risk.HIGH {
+        color: #f87171;
+      }
+      .risk.MEDIUM {
+        color: #fbbf24;
+      }
+      .risk.LOW {
+        color: #34d399;
+      }
+      .count {
+        color: #8b98a9;
+        font-size: 12px;
+        margin-top: 2px;
+      }
+      .note {
+        margin-top: 8px;
+        font-size: 11.5px;
+        color: #8b98a9;
+        border-top: 1px dashed #1e2a3a;
+        padding-top: 8px;
+      }
+      ul {
+        margin-top: 10px;
+        list-style: none;
+      }
+      li {
+        padding: 7px 0;
+        border-top: 1px solid #14202e;
+      }
+      li b {
+        display: block;
+        font-size: 12.5px;
+      }
+      li .ev {
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        color: #34d399;
+        word-break: break-all;
+      }
+      li .inf {
+        font-size: 11.5px;
+        color: #8b98a9;
+        margin-top: 2px;
+      }
+      .foot {
+        margin-top: 12px;
+        text-align: center;
+      }
+      .foot a {
+        color: #2dd4bf;
+        font-size: 12px;
+        text-decoration: none;
+      }
+      .muted {
+        color: #8b98a9;
+        font-size: 12px;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="shield">🛡</div>
+      <h1>Scam<span>Shield</span></h1>
+    </header>
+
+    <textarea id="text" placeholder="Paste a suspicious message, or grab the selected text from this page…"></textarea>
+    <button id="analyze" class="analyze">🔍 Analyze</button>
+    <button id="grab" class="grab">Grab selected text from page</button>
+
+    <section id="result" hidden></section>
+
+    <p class="muted" id="empty">Risk indicators are computed on-device — nothing you paste leaves your browser.</p>
+
+    <div class="foot">
+      <a href="https://scamshield.example.com/analyze" target="_blank" rel="noreferrer">Open full analyzer ↗</a>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

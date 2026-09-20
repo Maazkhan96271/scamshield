@@ -1,3 +1,6 @@
+import { isCommunityFlagged } from "./community";
+import { REGIONAL_RULES } from "./patterns-regional";
+
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 
 export type MessageKind = "email" | "sms" | "whatsapp" | "payment";
@@ -164,7 +167,7 @@ function detectClaimedOrganization(text: string, host?: string): string | null {
 /* verdicts are later merged with the AI analysis (see mergeVerdicts). */
 /* ================================================================== */
 
-interface Rule {
+export interface Rule {
   category: FlagCategory;
   weight: number;
   pattern: RegExp;
@@ -317,7 +320,7 @@ const GENERAL_RULES: Rule[] = [
   },
 ];
 
-const RULES: Rule[] = [...URGENCY_RULES, ...SENSITIVE_INFO_RULES, ...PAYMENT_RULES, ...GENERAL_RULES];
+const RULES: Rule[] = [...URGENCY_RULES, ...SENSITIVE_INFO_RULES, ...PAYMENT_RULES, ...GENERAL_RULES, ...REGIONAL_RULES];
 
 /* --- LINK DETECTOR (uses a real URL parser per extracted link) ------- */
 
@@ -873,6 +876,17 @@ export async function analyzeUrlMessage(rawUrl: string): Promise<AnalysisResult>
   }
 
   const flags = [...shape.flags];
+
+  // Community signal: domains that other users have repeatedly reported as scams.
+  if (isCommunityFlagged("domain", shape.host)) {
+    flags.push({
+      title: "Repeatedly reported by the community",
+      evidence: shape.host,
+      inference: "Other ScamShield users have flagged this domain multiple times — a strong but not infallible signal.",
+      weight: 22,
+      category: "links",
+    });
+  }
   let page: FetchedPage | null = null;
   try {
     page = await fetchPage(shape.normalized);

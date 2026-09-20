@@ -177,3 +177,16 @@ export async function deleteHistoryEntry(id: string): Promise<void> {
   const entries = await readAll();
   await writeAll(entries.filter((e) => e.id !== id));
 }
+
+/** Merges restored backup entries into local history (newest wins, capped). */
+export async function mergeHistory(restored: HistoryEntry[]): Promise<HistoryEntry[]> {
+  const local = await readAll();
+  const byId = new Map<string, HistoryEntry>();
+  for (const e of [...restored, ...local]) {
+    const existing = byId.get(e.id);
+    if (!existing || e.at > existing.at) byId.set(e.id, e);
+  }
+  const merged = [...byId.values()].sort((a, b) => b.at - a.at).slice(0, HISTORY_LIMIT);
+  await writeAll(merged);
+  return merged;
+}
