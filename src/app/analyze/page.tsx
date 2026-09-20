@@ -16,6 +16,7 @@ import {
   type RiskLevel,
   type SignalSeverity,
 } from "@/lib/scam";
+import { addHistory } from "@/lib/history";
 
 const RISK_EMOJI: Record<RiskLevel, string> = {
   HIGH: "🚨",
@@ -232,6 +233,16 @@ export default function AnalyzePage() {
   const chars = content.length;
   const overLimit = chars > MAX_CONTENT_LENGTH;
 
+  /** Switching message type starts a fresh scan — text, verdict and errors are cleared. */
+  function switchKind(next: MessageKind) {
+    if (next === kind) return;
+    setKind(next);
+    setContent("");
+    setResult(null);
+    setError(null);
+    setScannedText("");
+  }
+
   function handleFile(file: File) {
     setError(null);
     setResult(null);
@@ -278,8 +289,22 @@ export default function AnalyzePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(typeof data?.error === "string" ? data.error : "Analysis failed");
+      const result = data as AnalysisResult;
       setScannedText(mode === "text" ? content : mode === "url" ? urlInput.trim() : "");
-      setResult(data as AnalysisResult);
+      setResult(result);
+      // Archive the scan in the encrypted on-device history (best effort).
+      void addHistory({
+        mode,
+        kind: mode === "text" ? kind : undefined,
+        preview:
+          mode === "text"
+            ? content
+            : mode === "url"
+              ? urlInput.trim()
+              : "Screenshot scan",
+        url: mode === "url" ? urlInput.trim() : undefined,
+        result,
+      }).catch(() => undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     } finally {
@@ -307,9 +332,14 @@ export default function AnalyzePage() {
               Scam<span className="text-accent">Shield</span>
             </span>
           </Link>
-          <Link href="/" className="text-sm text-muted transition-colors hover:text-foreground">
-            ← Back to home
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/history" className="text-sm text-muted transition-colors hover:text-foreground">
+              History
+            </Link>
+            <Link href="/" className="text-sm text-muted transition-colors hover:text-foreground">
+              ← Back to home
+            </Link>
+          </div>
         </nav>
       </header>
 
@@ -327,7 +357,7 @@ export default function AnalyzePage() {
                 <button
                   key={k.value}
                   type="button"
-                  onClick={() => setKind(k.value)}
+                  onClick={() => switchKind(k.value)}
                   className={`rounded-lg border px-2.5 py-1 text-xs transition ${
                     kind === k.value
                       ? "border-accent/60 bg-accent/15 text-accent"

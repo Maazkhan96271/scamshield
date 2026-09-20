@@ -92,6 +92,7 @@ export default function Home() {
             <a href="#what-we-check" className="transition-colors hover:text-foreground">What we check</a>
             <a href="#how-it-works" className="transition-colors hover:text-foreground">How it works</a>
             <a href="#verdicts" className="transition-colors hover:text-foreground">Verdicts</a>
+            <Link href="/history" className="transition-colors hover:text-foreground">History</Link>
           </div>
           <Link
             href="/analyze"
@@ -137,7 +138,7 @@ export default function Home() {
               </a>
             </div>
             <p className="mt-4 font-mono text-xs text-muted">
-              NO SIGN-UP · NO MESSAGE STORAGE · VERDICTS IN SECONDS
+              NO SIGN-UP · HISTORY ENCRYPTED ON YOUR DEVICE · VERDICTS IN SECONDS
             </p>
           </div>
 
