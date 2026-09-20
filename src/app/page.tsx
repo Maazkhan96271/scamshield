@@ -15,31 +15,15 @@ function ShieldLogo({ className = "h-7 w-7" }: { className?: string }) {
   );
 }
 
-const CATEGORY_CARDS = [
-  {
-    title: "Urgency & pressure",
-    body: "Countdowns, “final warnings”, threats to close your account — pressure is the scammer’s favourite tool.",
-  },
-  {
-    title: "Authority impersonation",
-    body: "Fake banks, delivery firms, tax offices and “security teams” that real institutions never send this way.",
-  },
-  {
-    title: "Payment traps",
-    body: "Gift cards, crypto, wire transfers and surprise “fees” — payment methods designed to be unrecoverable.",
-  },
-  {
-    title: "Credential harvesting",
-    body: "Requests for one-time codes, passwords, PINs or card details. Nobody legitimate asks for these.",
-  },
-  {
-    title: "Suspicious links",
-    body: "Shorteners, look-alike domains and brand names that don’t match where the link actually leads.",
-  },
-  {
-    title: "Prize & opportunity baits",
-    body: "Lotteries you never entered, guaranteed returns, easy money — the oldest baits in the book.",
-  },
+const RULE_LEDGER = [
+  { n: "01", name: "Urgency & pressure", weight: 20, body: "Countdowns, “final warnings”, threats to close your account." },
+  { n: "02", name: "Authority impersonation", weight: 16, body: "Fake banks, couriers, tax offices, “security teams”." },
+  { n: "03", name: "OTP / PIN / password requests", weight: 30, body: "Nobody legitimate asks you to share these." },
+  { n: "04", name: "Payment traps", weight: 28, body: "Gift cards, crypto, wire transfers, surprise “fees”." },
+  { n: "05", name: "Link forensics", weight: 25, body: "Shorteners, look-alike domains, brand mismatch, punycode." },
+  { n: "06", name: "Prize & opportunity bait", weight: 24, body: "Lotteries you never entered, guaranteed returns." },
+  { n: "07", name: "Delivery fee tricks", weight: 16, body: "“Your parcel is held — pay a small fee to release it.”" },
+  { n: "08", name: "Secrecy demands", weight: 22, body: "“Don’t tell the bank.” Real institutions never say this." },
 ];
 
 const STEPS = [
@@ -61,16 +45,16 @@ const STEPS = [
 ];
 
 const VERDICTS = [
-  { level: "HIGH", color: "text-danger", ring: "border-danger/40 bg-danger/10", body: "Do not act. Strong hallmarks of a scam." },
-  { level: "MEDIUM", color: "text-warn", ring: "border-warn/40 bg-warn/10", body: "Proceed with extreme caution and verify first." },
-  { level: "LOW", color: "text-safe", ring: "border-safe/40 bg-safe/10", body: "No red flags found — stay alert anyway." },
+  { level: "HIGH", color: "text-danger", border: "border-l-danger", body: "Do not act. Strong hallmarks of a scam." },
+  { level: "MEDIUM", color: "text-warn", border: "border-l-warn", body: "Proceed with extreme caution and verify first." },
+  { level: "LOW", color: "text-safe", border: "border-l-safe", body: "No red flags found — stay alert anyway." },
 ];
 
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Nav */}
-      <header className="sticky top-0 z-40 border-b border-line/70 bg-background/80 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b border-line/70 bg-background/85 backdrop-blur-md">
         <nav className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent/30 bg-accent/10 text-accent">
@@ -99,18 +83,12 @@ export default function Home() {
       </header>
 
       {/* Hero */}
-      <section className="grid-bg relative overflow-hidden">
+      <section className="grid-bg relative overflow-hidden border-b border-line/70">
         <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 pb-20 pt-16 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pt-24">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
-              <span className="pulse-dot inline-block h-1.5 w-1.5 rounded-full bg-accent" />
-              Scam risk analysis · emails, SMS, WhatsApp & payment requests
-            </div>
-            <h1 className="mt-6 text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
-              Analyze suspicious messages{" "}
-              <span className="bg-gradient-to-r from-accent to-accent-strong bg-clip-text text-transparent">
-                before you act.
-              </span>
+            <p className="kicker">Scam-risk analyzer · no account · no cloud</p>
+            <h1 className="mt-5 max-w-xl text-5xl font-semibold leading-[1.04] tracking-tight sm:text-6xl">
+              Analyze suspicious messages before you act.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-muted">
               ScamShield scans messages for the tactics scammers rely on — urgency, fake authority,
@@ -120,7 +98,7 @@ export default function Home() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/analyze"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-accent px-6 font-semibold text-background shadow-[0_0_40px_-10px_rgba(45,212,191,0.5)] transition hover:bg-accent-strong"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-accent px-6 font-semibold text-background transition hover:bg-accent-strong"
               >
                 <ShieldLogo className="h-5 w-5" />
                 Scan a message free
@@ -186,31 +164,35 @@ export default function Home() {
         </div>
       </section>
 
-      {/* What we check */}
-      <section id="what-we-check" className="border-t border-line/70 bg-surface/30 py-20">
+      {/* What we check — ledger, not cards */}
+      <section id="what-we-check" className="py-20">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-          <p className="font-mono text-xs uppercase tracking-widest text-accent">What ScamShield checks</p>
+          <p className="kicker">What ScamShield checks</p>
           <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
             Red flags across ten scam-tactic categories
           </h2>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {CATEGORY_CARDS.map((c) => (
-              <div
-                key={c.title}
-                className="panel rounded-xl p-5 transition-colors hover:border-accent/35"
-              >
-                <h3 className="font-medium text-foreground">{c.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-muted">{c.body}</p>
-              </div>
+          <ul className="mt-10">
+            {RULE_LEDGER.map((r) => (
+              <li key={r.n} className="rule-row flex flex-col gap-1 py-4 sm:flex-row sm:items-baseline sm:gap-6">
+                <span className="w-8 shrink-0 font-mono text-xs text-muted">{r.n}</span>
+                <span className="w-64 shrink-0 font-medium text-foreground">{r.name}</span>
+                <span className="min-w-0 flex-1 text-sm leading-6 text-muted">{r.body}</span>
+                <span className="shrink-0 font-mono text-[11px] uppercase tracking-widest text-accent/80">
+                  weight {r.weight}
+                </span>
+              </li>
             ))}
-          </div>
+          </ul>
+          <p className="mt-4 font-mono text-[11px] uppercase tracking-widest text-muted">
+            Weights are internal scores, not probabilities — total 60+ maps to HIGH risk.
+          </p>
         </div>
       </section>
 
       {/* How it works */}
-      <section id="how-it-works" className="border-t border-line/70 py-20">
+      <section id="how-it-works" className="border-t border-line/70 bg-surface/30 py-20">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-          <p className="font-mono text-xs uppercase tracking-widest text-accent">How it works</p>
+          <p className="kicker">How it works</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">From paste to peace of mind</h2>
           <div className="mt-10 grid gap-4 md:grid-cols-3">
             {STEPS.map((s) => (
@@ -225,13 +207,13 @@ export default function Home() {
       </section>
 
       {/* Verdicts */}
-      <section id="verdicts" className="border-t border-line/70 bg-surface/30 py-20">
+      <section id="verdicts" className="border-t border-line/70 py-20">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-          <p className="font-mono text-xs uppercase tracking-widest text-accent">Reading the verdict</p>
+          <p className="kicker">Reading the verdict</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Clear levels, honest language</h2>
           <div className="mt-10 grid gap-4 md:grid-cols-3">
             {VERDICTS.map((v) => (
-              <div key={v.level} className={`rounded-xl border p-6 ${v.ring}`}>
+              <div key={v.level} className={`panel rounded-xl border border-line border-l-4 p-6 ${v.border}`}>
                 <p className={`font-mono text-xl font-bold tracking-wide ${v.color}`}>{v.level}</p>
                 <p className="mt-2 text-sm leading-6 text-foreground/85">{v.body}</p>
               </div>
@@ -253,7 +235,8 @@ export default function Home() {
       {/* Final CTA */}
       <section className="grid-bg border-t border-line/70 py-24">
         <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-4 text-center sm:px-6">
-          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+          <p className="kicker">Ten seconds · zero sign-up</p>
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
             Got a message that feels off?
           </h2>
           <p className="mt-4 max-w-xl text-muted">
@@ -262,7 +245,7 @@ export default function Home() {
           </p>
           <Link
             href="/analyze"
-            className="mt-8 inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-accent px-8 font-semibold text-background shadow-[0_0_40px_-10px_rgba(45,212,191,0.5)] transition hover:bg-accent-strong"
+            className="mt-8 inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-accent px-8 font-semibold text-background transition hover:bg-accent-strong"
           >
             <ShieldLogo className="h-5 w-5" />
             Analyze a message
@@ -275,9 +258,9 @@ export default function Home() {
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-4 px-4 text-sm text-muted sm:flex-row sm:px-6">
           <div className="flex items-center gap-2">
             <ShieldLogo className="h-4 w-4 text-accent" />
-            <span>ScamShield © 2026</span>
+            <span className="font-mono text-xs uppercase tracking-widest">ScamShield © 2026</span>
           </div>
-          <p>If you think you’ve already been scammed, contact your bank immediately.</p>
+          <p className="font-mono text-xs uppercase tracking-widest">Indicators, not verdicts · Verify via official channels</p>
         </div>
       </footer>
     </div>

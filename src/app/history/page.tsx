@@ -159,7 +159,8 @@ export default function HistoryPage() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Scan history</h1>
+            <p className="kicker">Local vault</p>
+            <h1 className="mt-1.5 text-2xl font-semibold tracking-tight">Scan history</h1>
             <p className="mt-1 text-sm text-muted">
               Your last {HISTORY_LIMIT} scans, encrypted on this device only — never sent to any server.
             </p>
@@ -274,7 +275,7 @@ export default function HistoryPage() {
           {entries !== null && entries.length > 0 && (
             <ul className="space-y-3">
               {entries.map((entry) => (
-                <li key={entry.id} className="panel rounded-2xl p-4 sm:p-5">
+                <li key={entry.id} className="rule-row py-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5">
                       <span className="text-xl leading-none" aria-hidden>
@@ -289,7 +290,7 @@ export default function HistoryPage() {
                           ? ` · ${MESSAGE_KINDS.find((k) => k.value === entry.kind)?.label ?? ""}`
                           : ""}
                       </span>
-                      <span className="text-xs text-muted">{formatWhen(entry.at)}</span>
+                      <span className="font-mono text-[11px] uppercase tracking-widest text-muted">{formatWhen(entry.at)}</span>
                     </div>
                     <button
                       type="button"
@@ -336,7 +337,7 @@ export default function HistoryPage() {
           )}
         </div>
 
-        <p className="mt-8 text-center text-xs text-muted">
+        <p className="mt-8 text-center font-mono text-[11px] uppercase tracking-widest text-muted">
           Encrypted with AES-256-GCM in your browser. Clearing your browser data or this history removes it
           permanently — there is no cloud copy.
         </p>

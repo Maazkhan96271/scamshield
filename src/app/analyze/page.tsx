@@ -94,10 +94,10 @@ const SAMPLES: { label: string; kind: MessageKind; text: string }[] = [
   },
 ];
 
-const RISK_STYLES: Record<RiskLevel, { chip: string; bar: string; label: string }> = {
-  HIGH: { chip: "border-danger/50 bg-danger/10 text-danger", bar: "from-warn to-danger", label: "HIGH RISK" },
-  MEDIUM: { chip: "border-warn/50 bg-warn/10 text-warn", bar: "from-safe to-warn", label: "MEDIUM RISK" },
-  LOW: { chip: "border-safe/50 bg-safe/10 text-safe", bar: "from-safe to-safe", label: "LOW RISK" },
+const RISK_STYLES: Record<RiskLevel, { chip: string; bar: string; label: string; barBorder: string }> = {
+  HIGH: { chip: "border-danger/50 bg-danger/10 text-danger", bar: "from-warn to-danger", label: "HIGH RISK", barBorder: "border-l-danger" },
+  MEDIUM: { chip: "border-warn/50 bg-warn/10 text-warn", bar: "from-safe to-warn", label: "MEDIUM RISK", barBorder: "border-l-warn" },
+  LOW: { chip: "border-safe/50 bg-safe/10 text-safe", bar: "from-safe to-safe", label: "LOW RISK", barBorder: "border-l-safe" },
 };
 
 interface UploadedImage {
@@ -185,7 +185,7 @@ function TriggerSection({
 
   return (
     <div className="panel rounded-2xl border-accent/25 p-5 sm:p-6">
-      <h2 className="font-medium">🔍 What triggered the warning</h2>
+      <h2 className="kicker">🔍 What triggered the warning</h2>
       <p className="mt-1 text-xs text-muted">
         Suspicious phrases highlighted in the original {sourceLabel} — every mark matches an indicator above.
       </p>
@@ -624,8 +624,8 @@ export default function AnalyzePage() {
 
           {!loading && !error && result && (
             <div className="rise-in space-y-4">
-              {/* Verdict header */}
-              <div className="panel panel-glow rounded-2xl p-5 sm:p-6">
+              {/* Verdict header — forensic bar with risk-colored left rule */}
+              <div className={`panel panel-glow rounded-2xl border-l-4 ${RISK_STYLES[result.risk_level].barBorder} p-5 sm:p-6`}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <span className="text-4xl leading-none" aria-hidden>
@@ -664,9 +664,9 @@ export default function AnalyzePage() {
                     </button>
                   </div>
                 </div>
-                <p className="mt-3 font-mono text-xs text-muted">
-                  {result.source === "ai" ? "AI + rule engine analysis" : "rule engine analysis"} · confidence in verdict:{" "}
-                  <span className="text-accent">{confidenceBand(result.confidence)}</span> (not a probability of fraud)
+                <p className="mt-3 font-mono text-[11px] uppercase tracking-widest text-muted">
+                  {result.source === "ai" ? "AI + rule engine" : "rule engine"} · confidence in verdict:{" "}
+                  <span className="text-accent">{confidenceBand(result.confidence)}</span> · not a probability of fraud
                 </p>
                 <p className="mt-4 text-[15px] leading-7 text-foreground/90">{result.explanation}</p>
                 {result.claimed_organization && (
@@ -694,7 +694,7 @@ export default function AnalyzePage() {
               {/* Scanned link */}
               {result.scanned_url && (
                 <div className="panel rounded-2xl p-5 sm:p-6">
-                  <h2 className="font-medium">Link checked</h2>
+                  <h2 className="kicker">Link checked</h2>
                   <p className="mt-2 break-all font-mono text-xs text-warn">{result.scanned_url}</p>
                   {result.page_title && (
                     <p className="mt-2 text-sm text-muted">
@@ -708,6 +708,7 @@ export default function AnalyzePage() {
               {result.signals.length > 0 && (
                 <div className="panel rounded-2xl p-5 sm:p-6">
                   <h2 className="font-medium">
+                    <span className="kicker mr-2">Observed</span>
                     Observable indicators <span className="font-mono text-sm text-muted">({result.signals.length})</span>
                   </h2>
                   <ul className="mt-4 space-y-4">
@@ -749,7 +750,7 @@ export default function AnalyzePage() {
               {/* Links */}
               {!result.scanned_url && result.extracted_urls.length > 0 && (
                 <div className="panel rounded-2xl p-5 sm:p-6">
-                  <h2 className="font-medium">Links in the message</h2>
+                  <h2 className="kicker">Links in the message</h2>
                   <ul className="mt-3 space-y-1.5 font-mono text-xs">
                     {result.extracted_urls.map((link, i) => (
                       <li key={i} className="break-all rounded-md border border-line/70 bg-background/60 px-3 py-2 text-warn">
@@ -770,7 +771,7 @@ export default function AnalyzePage() {
 
               {/* Recommendations */}
               <div className="panel rounded-2xl border-accent/25 p-5 sm:p-6">
-                <h2 className="font-medium text-accent">🛡️ What you should do</h2>
+                <h2 className="kicker">🛡️ What you should do</h2>
                 <ul className="mt-4 space-y-3">
                   {result.recommended_actions.map((rec, i) => (
                     <li key={i} className="flex gap-3 text-sm leading-6">
@@ -865,7 +866,7 @@ function CommunityReportCard({ urls, phones }: { urls: string[]; phones: string[
 
   return (
     <div className="panel rounded-2xl p-5 sm:p-6">
-      <h2 className="font-medium">🧭 Community reports</h2>
+      <h2 className="kicker">🧭 Community reports</h2>
       <p className="mt-1 text-xs text-muted">
         Crowd-sourced flags for the targets in this scan. Reports contain only the domain/number and a
         verdict word — never your message. Community signals are hints, not proof.
