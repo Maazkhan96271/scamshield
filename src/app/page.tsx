@@ -1,5 +1,6 @@
 import Link from "next/link";
 import PwaProviders from "@/components/PwaProviders";
+import LandingDemo from "@/components/LandingDemo";
 
 function ShieldLogo({ className = "h-7 w-7" }: { className?: string }) {
   return (
@@ -161,6 +162,13 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Try it now — live client-side demo */}
+      <section className="border-b border-line/70 py-14">
+        <div className="mx-auto w-full max-w-4xl px-4 sm:px-6">
+          <LandingDemo />
         </div>
       </section>
 

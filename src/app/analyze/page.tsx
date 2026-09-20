@@ -134,7 +134,7 @@ function ScanButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-5 text-sm font-semibold text-background shadow-[0_0_36px_-14px_rgba(45,212,191,0.5)] transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
+      className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-5 text-sm font-semibold text-background transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
     >
       {label}
     </button>
@@ -232,6 +232,22 @@ export default function AnalyzePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [reportCopied, setReportCopied] = useState(false);
+
+  /** Ctrl/Cmd+Enter anywhere on the page starts the scan for the active mode. */
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !loading) {
+        e.preventDefault();
+        if (activeMode === "text" && content.trim()) void runScan("text");
+        else if (activeMode === "url" && urlInput.trim()) void runScan("url");
+        else if (activeMode === "image" && image) void runScan("image");
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMode, content, urlInput, image, loading]);
 
   /** Compact, human-readable summary of a verdict for the clipboard / share sheet. */
   function verdictSummary(r: AnalysisResult): string {
@@ -244,6 +260,40 @@ export default function AnalyzePage() {
     lines.push(r.explanation);
     lines.push("— analyzed with ScamShield (guidance, not certainty)");
     return lines.join("\n");
+  }
+
+  /** Formal incident report for forwarding to a bank, employer or IT security team. */
+  function incidentReport(r: AnalysisResult): string {
+    const lines = [
+      "=== SCAM INCIDENT REPORT ===",
+      `Generated: ${new Date().toLocaleString()} via ScamShield`,
+      "",
+      `Risk level: ${r.risk_level} (${r.signals.length} indicator${r.signals.length === 1 ? "" : "s"} detected)`,
+    ];
+    if (r.claimed_organization) lines.push(`Message claims to be from: ${r.claimed_organization}`);
+    if (r.scanned_url) lines.push(`URL checked: ${r.scanned_url}`);
+    else if (r.extracted_urls.length > 0) lines.push(`URLs found: ${r.extracted_urls.join(", ")}`);
+    if (r.extracted_text) lines.push("", "--- Original message (transcribed) ---", r.extracted_text);
+    lines.push("", "--- Indicators observed ---");
+    for (const s of r.signals) {
+      lines.push(`• [${signalSeverity(s.weight).toUpperCase()}] ${s.title}${s.evidence ? ` — observed: ${s.evidence}` : ""}`);
+    }
+    lines.push("", "--- Summary ---", r.explanation);
+    lines.push("", "--- Recommended actions ---");
+    r.recommended_actions.forEach((a, i) => lines.push(`${i + 1}. ${a}`));
+    lines.push("", "Note: automated indicator analysis — not a determination of fraud. Verify through official channels.");
+    return lines.join("\n");
+  }
+
+  async function copyIncidentReport() {
+    if (!result) return;
+    try {
+      await navigator.clipboard.writeText(incidentReport(result));
+      setReportCopied(true);
+      setTimeout(() => setReportCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable — ignore */
+    }
   }
 
   async function shareVerdict() {
@@ -460,6 +510,7 @@ export default function AnalyzePage() {
               ))}
             </div>
             <ScanButton label="🔍 Analyze" onClick={() => runScan("text")} disabled={loading || !content.trim() || overLimit} />
+            <span className="hidden font-mono text-[11px] uppercase tracking-widest text-muted sm:block">Ctrl+Enter</span>
           </div>
 
           {/* 2. QR code */}
@@ -589,14 +640,7 @@ export default function AnalyzePage() {
 
         {/* Result column */}
         <section aria-live="polite">
-          {loading && (
-            <div className="panel relative flex min-h-[420px] flex-col items-center justify-center overflow-hidden rounded-2xl">
-              <div className="scanline" aria-hidden />
-              <ShieldLogo className="h-10 w-10 text-accent" />
-              <p className="mt-4 font-medium">{loadingText}</p>
-              <p className="mt-1 font-mono text-xs text-muted">checking urgency · authority · payments · links</p>
-            </div>
-          )}
+          {loading && <ScanPanel loadingText={loadingText} />}
 
           {!loading && error && (
             <div className="panel flex min-h-[420px] items-center rounded-2xl p-6">
@@ -654,6 +698,14 @@ export default function AnalyzePage() {
                     >
                       {RISK_STYLES[result.risk_level].label}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => void copyIncidentReport()}
+                      className="rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-muted transition hover:border-accent/40 hover:text-accent"
+                      title="Copy a formal incident report for your bank or IT team"
+                    >
+                      {reportCopied ? "✓ Copied" : "Copy report"}
+                    </button>
                     <button
                       type="button"
                       onClick={() => void shareVerdict()}
@@ -798,6 +850,53 @@ export default function AnalyzePage() {
 
 function kindLabel(kind: MessageKind): string {
   return MESSAGE_KINDS.find((k) => k.value === kind)?.label ?? "Email";
+}
+
+const SCAN_STEPS = [
+  "parsing message structure…",
+  "extracting and parsing links…",
+  "checking sender IDs and domains…",
+  "weighing urgency & threat patterns…",
+  "scanning payment & credential requests…",
+  "compiling observed evidence…",
+];
+
+/**
+ * Forensic scanning panel — cycles through engine steps so the wait reads as
+ * an instrument working, not a spinner.
+ */
+function ScanPanel({ loadingText }: { loadingText: string }) {
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => setStep((s) => (s + 1) % SCAN_STEPS.length), 700);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="panel relative flex min-h-[420px] flex-col items-center justify-center overflow-hidden rounded-2xl">
+      <div className="scanline" aria-hidden />
+      <ShieldLogo className="h-10 w-10 text-accent" />
+      <p className="mt-4 font-medium">{loadingText}</p>
+      <ul className="mt-5 w-full max-w-sm space-y-1.5 px-6 font-mono text-xs" aria-hidden>
+        {SCAN_STEPS.map((label, i) => {
+          const state = i < step ? "done" : i === step ? "active" : "pending";
+          return (
+            <li
+              key={label}
+              className={`flex items-center gap-2.5 transition-colors duration-300 ${
+                state === "done" ? "text-safe" : state === "active" ? "text-accent" : "text-muted/40"
+              }`}
+            >
+              <span className="w-4 shrink-0 text-center">{state === "done" ? "✓" : state === "active" ? "▸" : "·"}</span>
+              {label}
+            </li>
+          );
+        })
+        }
+      </ul>
+    </div>
+  );
 }
 
 /** Phone-number-looking tokens from the analyzed text (for community reporting). */

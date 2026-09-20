@@ -3,7 +3,10 @@
   "name": "ScamShield — scam-risk checker",
   "version": "1.0.0",
   "description": "Highlight scam indicators in any suspicious message or link before you act. Runs the ScamShield rule engine entirely on-device.",
-  "permissions": ["storage", "activeTab", "scripting"],
+  "permissions": ["storage", "activeTab", "scripting", "contextMenus"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "Check this page with ScamShield"

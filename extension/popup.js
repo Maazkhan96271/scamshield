@@ -72,6 +72,15 @@ function scoreText(text) {
 const $ = (id) => document.getElementById(id);
 const resultBox = $("result");
 
+/** Consume text handed over by the right-click context menu, if any. */
+chrome.storage?.session?.get(["pendingText"], ({ pendingText } = {}) => {
+  if (pendingText) {
+    $("text").value = pendingText;
+    chrome.storage.session.remove("pendingText");
+    $("analyze").click();
+  }
+});
+
 $("grab").addEventListener("click", async () => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
