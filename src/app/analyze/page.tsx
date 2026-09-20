@@ -1,16 +1,72 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  confidenceBand,
   MAX_CONTENT_LENGTH,
   MAX_IMAGE_BYTES,
   MESSAGE_KINDS,
+  signalSeverity,
   type AnalysisMode,
   type AnalysisResult,
+  type FlagCategory,
+  type Highlight,
   type MessageKind,
   type RiskLevel,
+  type SignalSeverity,
 } from "@/lib/scam";
+
+const RISK_EMOJI: Record<RiskLevel, string> = {
+  HIGH: "🚨",
+  MEDIUM: "⚠️",
+  LOW: "✅",
+};
+
+const RISK_TITLE: Record<RiskLevel, string> = {
+  HIGH: "High Risk",
+  MEDIUM: "Medium Risk",
+  LOW: "Low Risk",
+};
+
+const SEV_ORDER: Record<SignalSeverity, number> = { high: 3, medium: 2, low: 1 };
+
+const SEVERITY_META: Record<SignalSeverity, { label: string; chip: string; mark: string; dot: string }> = {
+  high: {
+    label: "High severity",
+    chip: "border-danger/50 bg-danger/10 text-danger",
+    mark: "bg-danger/25 text-danger decoration-danger/60 underline decoration-2 underline-offset-4",
+    dot: "bg-danger",
+  },
+  medium: {
+    label: "Medium severity",
+    chip: "border-warn/50 bg-warn/10 text-warn",
+    mark: "bg-warn/25 text-warn decoration-warn/60 underline decoration-2 underline-offset-4",
+    dot: "bg-warn",
+  },
+  low: {
+    label: "Low severity",
+    chip: "border-line bg-surface-2 text-muted",
+    mark: "bg-accent/20 text-accent decoration-accent/60 underline decoration-2 underline-offset-4",
+    dot: "bg-accent",
+  },
+};
+
+const CATEGORY_META: Record<FlagCategory, { icon: string; label: string }> = {
+  urgency: { icon: "⏰", label: "Urgency" },
+  authority: { icon: "🎭", label: "Impersonation" },
+  credentials: { icon: "🔐", label: "Sensitive information" },
+  payment: { icon: "💳", label: "Payment request" },
+  links: { icon: "🔗", label: "Suspicious link" },
+  prize: { icon: "🎁", label: "Prize bait" },
+  opportunity: { icon: "💰", label: "Too-good-to-be-true" },
+  delivery: { icon: "📦", label: "Delivery trick" },
+  techsupport: { icon: "🖥️", label: "Fake tech support" },
+  secrecy: { icon: "🤫", label: "Secrecy pressure" },
+  attachments: { icon: "📎", label: "Attachment" },
+  software: { icon: "⬇️", label: "Software install" },
+  tone: { icon: "✍️", label: "Formatting anomalies" },
+};
 
 const SAMPLES: { label: string; kind: MessageKind; text: string }[] = [
   {
@@ -82,6 +138,85 @@ function ScanButton({
   );
 }
 
+interface TriggerPart {
+  text: string;
+  h?: Highlight;
+}
+
+/** "Show me exactly what triggered the warning" — highlights matched phrases in the original text. */
+function TriggerSection({
+  text,
+  highlights,
+  sourceLabel,
+}: {
+  text: string;
+  highlights: Highlight[];
+  sourceLabel: string;
+}) {
+  const { parts, matched } = useMemo(() => {
+    const claimed: { start: number; end: number; h: Highlight; display: string }[] = [];
+    const lower = text.toLowerCase();
+    const ordered = [...highlights].sort(
+      (a, b) => SEV_ORDER[b.severity] - SEV_ORDER[a.severity] || b.text.length - a.text.length,
+    );
+    for (const h of ordered) {
+      const start = lower.indexOf(h.text.toLowerCase());
+      if (start === -1) continue;
+      const end = start + h.text.length;
+      if (claimed.some((c) => start < c.end && end > c.start)) continue;
+      claimed.push({ start, end, h, display: text.slice(start, end) });
+    }
+    claimed.sort((a, b) => a.start - b.start);
+    const parts: TriggerPart[] = [];
+    let pos = 0;
+    for (const c of claimed) {
+      if (c.start > pos) parts.push({ text: text.slice(pos, c.start) });
+      parts.push({ text: c.display, h: c.h });
+      pos = c.end;
+    }
+    if (pos < text.length) parts.push({ text: text.slice(pos) });
+    return { parts, matched: claimed };
+  }, [text, highlights]);
+
+  if (matched.length === 0) return null;
+
+  return (
+    <div className="panel rounded-2xl border-accent/25 p-5 sm:p-6">
+      <h2 className="font-medium">🔍 What triggered the warning</h2>
+      <p className="mt-1 text-xs text-muted">
+        Suspicious phrases highlighted in the original {sourceLabel} — every mark matches an indicator above.
+      </p>
+      <div className="mt-3 max-h-72 overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-line bg-background/60 p-4 font-mono text-sm leading-7 text-foreground/85">
+        {parts.map((p, i) =>
+          p.h ? (
+            <mark
+              key={i}
+              title={CATEGORY_META[p.h.category].label}
+              className={`rounded px-0.5 font-semibold ${SEVERITY_META[p.h.severity].mark}`}
+            >
+              {p.text}
+            </mark>
+          ) : (
+            <span key={i}>{p.text}</span>
+          ),
+        )}
+      </div>
+      <ul className="mt-3 flex flex-wrap gap-1.5">
+        {matched.map((m, i) => (
+          <li
+            key={i}
+            className="flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface-2/60 px-2.5 py-1 text-xs"
+          >
+            <span className={`h-2 w-2 shrink-0 rounded-full ${SEVERITY_META[m.h.severity].dot}`} aria-hidden />
+            <span className="font-medium text-foreground/85">{CATEGORY_META[m.h.category].label}</span>
+            <span className="max-w-[12rem] truncate font-mono text-muted">“{m.display}”</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function AnalyzePage() {
   const [content, setContent] = useState("");
   const [kind, setKind] = useState<MessageKind>("email");
@@ -89,6 +224,7 @@ export default function AnalyzePage() {
   const [image, setImage] = useState<UploadedImage | null>(null);
   const [dragging, setDragging] = useState(false);
   const [activeMode, setActiveMode] = useState<AnalysisMode>("text");
+  const [scannedText, setScannedText] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +278,7 @@ export default function AnalyzePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(typeof data?.error === "string" ? data.error : "Analysis failed");
+      setScannedText(mode === "text" ? content : mode === "url" ? urlInput.trim() : "");
       setResult(data as AnalysisResult);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
@@ -384,11 +521,19 @@ export default function AnalyzePage() {
               {/* Verdict header */}
               <div className="panel panel-glow rounded-2xl p-5 sm:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span
-                    className={`rounded-md border px-3 py-1.5 font-mono text-sm font-bold tracking-wide ${RISK_STYLES[result.risk_level].chip}`}
-                  >
-                    {RISK_STYLES[result.risk_level].label}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-4xl leading-none" aria-hidden>
+                      {RISK_EMOJI[result.risk_level]}
+                    </span>
+                    <div>
+                      <h2 className="text-xl font-bold tracking-tight">{RISK_TITLE[result.risk_level]}</h2>
+                      <p className="mt-0.5 text-sm text-muted">
+                        {result.signals.length > 0
+                          ? `${result.signals.length} risk indicator${result.signals.length === 1 ? "" : "s"} detected`
+                          : "No risk indicators detected"}
+                      </p>
+                    </div>
+                  </div>
                   <div className="flex items-center gap-3">
                     {activeMode === "image" && image && (
                       /* eslint-disable-next-line @next/next/no-img-element */
@@ -398,24 +543,17 @@ export default function AnalyzePage() {
                         className="h-10 w-14 rounded border border-line object-cover"
                       />
                     )}
-                    <span className="font-mono text-xs text-muted">
-                      {result.source === "ai" ? "AI + rule engine analysis" : "rule engine analysis"}
+                    <span
+                      className={`rounded-md border px-3 py-1.5 font-mono text-sm font-bold tracking-wide ${RISK_STYLES[result.risk_level].chip}`}
+                    >
+                      {RISK_STYLES[result.risk_level].label}
                     </span>
                   </div>
                 </div>
-                <div className="mt-4">
-                  <div className="flex items-center justify-between font-mono text-[11px] uppercase tracking-widest text-muted">
-                    <span>Confidence</span>
-                    <span className="text-accent">{result.confidence}%</span>
-                  </div>
-                  <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-surface-2">
-                    <div
-                      className="h-full rounded-full bg-accent/80 transition-all duration-700"
-                      style={{ width: `${Math.max(result.confidence, 4)}%` }}
-                    />
-                  </div>
-                  <p className="mt-1.5 text-xs text-muted">How strongly the evidence supports this verdict — never certainty.</p>
-                </div>
+                <p className="mt-3 font-mono text-xs text-muted">
+                  {result.source === "ai" ? "AI + rule engine analysis" : "rule engine analysis"} · confidence in verdict:{" "}
+                  <span className="text-accent">{confidenceBand(result.confidence)}</span> (not a probability of fraud)
+                </p>
                 <p className="mt-4 text-[15px] leading-7 text-foreground/90">{result.explanation}</p>
                 {result.claimed_organization && (
                   <p className="mt-3 text-sm text-muted">
@@ -429,6 +567,15 @@ export default function AnalyzePage() {
                   <p className="mt-3 rounded-lg border border-warn/40 bg-warn/10 p-3 text-sm text-warn">{result.note}</p>
                 )}
               </div>
+
+              {/* What triggered the warning — the killer feature */}
+              <TriggerSection
+                text={result.extracted_text ?? scannedText}
+                highlights={result.highlights}
+                sourceLabel={
+                  activeMode === "image" ? "screenshot transcription" : activeMode === "url" ? "URL" : "message"
+                }
+              />
 
               {/* Scanned link */}
               {result.scanned_url && (
@@ -449,29 +596,38 @@ export default function AnalyzePage() {
                   <h2 className="font-medium">
                     Observable indicators <span className="font-mono text-sm text-muted">({result.signals.length})</span>
                   </h2>
-                  <ul className="mt-4 space-y-3.5">
-                    {result.signals.map((flag, i) => (
-                      <li key={i} className="flex gap-3">
-                        <span
-                          className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                            flag.weight >= 15 ? "bg-danger" : flag.weight >= 8 ? "bg-warn" : "bg-muted"
-                          }`}
-                        />
-                        <div>
-                          <p className="text-sm font-medium">{flag.title}</p>
-                          {flag.evidence && (
-                            <p className="mt-1 break-words font-mono text-xs leading-5 text-foreground/75">
-                              <span className="font-semibold text-safe">Observed:</span> {flag.evidence}
-                            </p>
-                          )}
-                          {flag.inference && (
-                            <p className="mt-1 text-sm leading-6 text-muted">
-                              <span className="font-medium text-foreground/80">Inference:</span> {flag.inference}
-                            </p>
-                          )}
-                        </div>
-                      </li>
-                    ))}
+                  <ul className="mt-4 space-y-4">
+                    {result.signals.map((flag, i) => {
+                      const sev = SEVERITY_META[signalSeverity(flag.weight)];
+                      return (
+                        <li key={i} className="flex gap-3">
+                          <span
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-base"
+                            aria-hidden
+                          >
+                            {CATEGORY_META[flag.category].icon}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium">{flag.title}</p>
+                              <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${sev.chip}`}>
+                                {sev.label}
+                              </span>
+                            </div>
+                            {flag.evidence && (
+                              <p className="mt-1 break-words font-mono text-xs leading-5 text-foreground/75">
+                                <span className="font-semibold text-safe">Observed:</span> {flag.evidence}
+                              </p>
+                            )}
+                            {flag.inference && (
+                              <p className="mt-1 text-sm leading-6 text-muted">
+                                <span className="font-medium text-foreground/80">Inference:</span> {flag.inference}
+                              </p>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
@@ -495,11 +651,11 @@ export default function AnalyzePage() {
 
               {/* Recommendations */}
               <div className="panel rounded-2xl border-accent/25 p-5 sm:p-6">
-                <h2 className="font-medium text-accent">Recommended next steps</h2>
-                <ul className="mt-4 space-y-2.5">
+                <h2 className="font-medium text-accent">🛡️ What you should do</h2>
+                <ul className="mt-4 space-y-3">
                   {result.recommended_actions.map((rec, i) => (
-                    <li key={i} className="flex gap-2.5 text-sm leading-6">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                    <li key={i} className="flex gap-3 text-sm leading-6">
+                      <span className="pt-0.5 font-mono text-xs font-bold text-accent">{String(i + 1).padStart(2, "0")}</span>
                       <span className="text-foreground/90">{rec}</span>
                     </li>
                   ))}

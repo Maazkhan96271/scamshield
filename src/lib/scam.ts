@@ -44,11 +44,27 @@ export interface ScamFlag {
   category: FlagCategory;
 }
 
+export type SignalSeverity = "high" | "medium" | "low";
+
+/** Maps an indicator's weight to a display severity. */
+export function signalSeverity(weight: number): SignalSeverity {
+  return weight >= 20 ? "high" : weight >= 10 ? "medium" : "low";
+}
+
+/** An exact phrase from the analyzed text that triggered an indicator. */
+export interface Highlight {
+  text: string;
+  category: FlagCategory;
+  severity: SignalSeverity;
+}
+
 export interface AnalysisResult {
   risk_level: RiskLevel;
   /** 0–100 — how confident the engine is in this verdict (never 95+: no certainty claims). */
   confidence: number;
   signals: ScamFlag[];
+  /** Exact phrases in the analyzed text that triggered indicators — powers the UI highlighter. */
+  highlights: Highlight[];
   explanation: string;
   recommended_actions: string[];
   extracted_urls: string[];
@@ -59,6 +75,8 @@ export interface AnalysisResult {
   note?: string;
   scanned_url?: string;
   page_title?: string;
+  /** Vision model's transcription of a screenshot, when available. */
+  extracted_text?: string;
 }
 
 export const MAX_CONTENT_LENGTH = 8000;
@@ -159,14 +177,14 @@ interface Rule {
 const URGENCY_RULES: Rule[] = [
   {
     category: "urgency",
-    weight: 14,
+    weight: 18,
     pattern: /\b(urgent|immediately|act now|right away|last warning|last chance|final (warning|notice)|time[- ]sensitive|don'?t (delay|wait)|expires? (today|in \d+)|within \d+ ?(minutes?|mins?|hours?|days?)|\d+ ?(minutes?|mins?|hours?|days?) (or|before))\b/i,
     title: "Urgency or pressure phrases",
     inference: "Pressure to act fast is a classic tactic to stop careful review or checking with someone.",
   },
   {
     category: "urgency",
-    weight: 15,
+    weight: 20,
     pattern: /\b(account (will be|is|has been) (suspended|closed|locked|deactivated|blocked|limited)|suspension|permanently (closed|disabled)|legal action|warrant|arre?st|unusual (activity|login)|suspicious (activity|login))\b/i,
     title: "Threat of consequences",
     inference: "Threats to close accounts or take legal action push people into clicking or paying before verifying anything.",
@@ -177,14 +195,14 @@ const URGENCY_RULES: Rule[] = [
 const SENSITIVE_INFO_RULES: Rule[] = [
   {
     category: "credentials",
-    weight: 16,
+    weight: 15,
     pattern: /\b(otp|one[- ]time (?:code|password|pin)|upi(?:\s+pin)?|\bpin\b|password|cvv|cvc|card number|bank account(?:\s+(?:number|details))?|security code|verification code|sort code|iban|social security number|ssn|mother'?s maiden name)\b/i,
     title: "References sensitive credentials",
     inference: "Mentions of OTPs, PINs, passwords, CVV or bank/card details are common in credential-harvesting attempts.",
   },
   {
     category: "credentials",
-    weight: 20,
+    weight: 30,
     pattern: /\b(confirm|verify|enter|provide|share)\s+(your\s+)?(identity|password|details|account|card(?:\s+number)?|pin|otp|banking|billing\s+details)\b/i,
     title: "Asks you to hand over credentials or financial details",
     inference: "No legitimate service asks for one-time codes, passwords or card details over email, SMS or chat.",
@@ -195,7 +213,7 @@ const SENSITIVE_INFO_RULES: Rule[] = [
 const PAYMENT_RULES: Rule[] = [
   {
     category: "payment",
-    weight: 18,
+    weight: 25,
     pattern: /\b(?:send|sent)\s+(?:money|funds|cash|\$|£|€|\d)|\bpay\s+now\b|\bmake\s+a\s+payment\b|\bpay\s+(?:the\s+)?(?:fee|amount|invoice|balance)\b|(?:money|bank)\s+transfer|wire\s+transfer|western\s+union|money\s?gram|\bzelle\b|\bcash\s?app\b|transfer\s+(?:money|funds|the\s+amount|\d)|deposit\s+(?:money|funds|the\s+amount|\d|now|today)|security\s+deposit|fee\s+of|(?:processing|handling|service|activation|release|customs|delivery|registration|clearance|unlock|admin)\s+fee|gift\s+card|(?:itunes|google\s+play|steam)\s+card|crypto(?:currency)?|bitcoin|\bbtc\b|usdt|ethereum/i,
     title: "Payment demand or transfer request",
     inference: "Payment demands — especially via gift cards, crypto or wire transfer — are hard to reverse and common in fraud.",
@@ -356,7 +374,7 @@ function analyzeUrlShape(rawUrl: string): { normalized: string; host: string; fl
     push(10, "Link is not encrypted (http://)", bareHost, "Anything typed on an unencrypted page can be intercepted. Legitimate sign-in pages always use https.");
   }
   if (SHORTENERS.test(bareHost)) {
-    push(12, "Shortened URL hides the real destination", bareHost, "URL shorteners conceal where the link actually leads.");
+    push(10, "Shortened URL hides the real destination", bareHost, "URL shorteners conceal where the link actually leads.");
   }
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(bareHost)) {
     push(14, "Address is a raw IP number", bareHost, "Real services don't serve their website from a bare IP address.");
@@ -371,19 +389,19 @@ function analyzeUrlShape(rawUrl: string): { normalized: string; host: string; fl
   for (const { brand, domain } of OFFICIAL_DOMAINS) {
     if (brand.test(bareHost) && !bareHost.endsWith(`.${domain}`) && bareHost !== domain) {
       brandMismatch = true;
-      push(18, "Brand name doesn't match the domain", bareHost, `The address contains "${domain.split(".")[0]}" but is not an official "${domain}" domain — a hallmark of brand impersonation.`);
+      push(20, "Brand name doesn't match the domain", bareHost, `The address contains "${domain.split(".")[0]}" but is not an official "${domain}" domain — a hallmark of brand impersonation.`);
       break;
     }
   }
   const kwCount = countUrlKeywords(`${bareHost}${parsed.pathname}`);
   if (kwCount > 0) {
-    push(Math.min(20, kwCount * 8), "Credential keywords in the address", bareHost, "Words like 'bank', 'login', 'verify' or 'account' inside URLs lend fake credibility.");
+    push(Math.min(20, kwCount * 7), "Credential keywords in the address", bareHost, "Words like 'bank', 'login', 'verify' or 'account' inside URLs lend fake credibility.");
   }
   if ((bareHost.split(".")[0].match(/-/g) ?? []).length >= 2) {
     push(10, "Hyphen-stuffed domain", bareHost, "Long hyphenated chains like 'bank-security-login' imitate trusted institutions.");
   }
   if (brandMismatch && kwCount > 0) {
-    push(20, "Classic phishing URL pattern", bareHost, "An impersonated brand combined with credential keywords is the signature of a fake sign-in page.");
+    push(25, "Classic phishing URL pattern", bareHost, "An impersonated brand combined with credential keywords is the signature of a fake sign-in page.");
   }
   if ((bareHost.match(/\./g) ?? []).length >= 3) {
     push(8, "Deeply nested subdomains", bareHost, "Many subdomain levels are often used to bury the real destination at the end.");
@@ -394,7 +412,7 @@ function analyzeUrlShape(rawUrl: string): { normalized: string; host: string; fl
 
 function linkFlags(text: string, links: string[]): ScamFlag[] {
   const flags: ScamFlag[] = [];
-  let budget = 24; // cap total weight from link-shape rules
+  let budget = 28; // cap total weight from link-shape rules
 
   // LINK DETECTOR — parse every extracted URL and collect its shape indicators.
   for (const link of links) {
@@ -440,7 +458,7 @@ function linkFlags(text: string, links: string[]): ScamFlag[] {
 
 function confidenceFor(risk: RiskLevel, signalCount: number, maxWeight: number): number {
   const signalBonus = Math.min(6, signalCount * 1.5);
-  const seriousBonus = maxWeight >= 18 ? 6 : maxWeight >= 14 ? 3 : 0;
+  const seriousBonus = maxWeight >= 25 ? 6 : maxWeight >= 14 ? 3 : 0;
   let conf: number;
   if (risk === "HIGH") conf = 72 + signalBonus + seriousBonus;
   else if (risk === "MEDIUM") conf = 50 + signalBonus * 0.5 + seriousBonus * 0.5;
@@ -448,20 +466,73 @@ function confidenceFor(risk: RiskLevel, signalCount: number, maxWeight: number):
   return Math.round(Math.max(40, Math.min(95, conf))); // never 95+ — no certainty claims
 }
 
+/** Qualitative band for display — we never show a bare number that could read as a fraud probability. */
+export function confidenceBand(confidence: number): "High" | "Moderate" | "Low" {
+  if (confidence >= 75) return "High";
+  if (confidence >= 55) return "Moderate";
+  return "Low";
+}
+
+/* --- Highlight extraction — "show me exactly what triggered this" ---- */
+
+function containsPhrase(text: string, phrase: string): boolean {
+  if (text.toLowerCase().includes(phrase.toLowerCase())) return true;
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  return new RegExp(escaped, "i").test(text);
+}
+
+/** Maps rule-detected evidence back to exact phrases in the analyzed text. */
+function buildHighlights(text: string, signals: ScamFlag[], extras: Highlight[] = []): Highlight[] {
+  const out: Highlight[] = [];
+  const seen = new Set<string>();
+  const tryAdd = (raw: string, category: FlagCategory, severity: SignalSeverity) => {
+    const phrase = raw.trim();
+    if (phrase.length < 3 || phrase.length > 120 || phrase.endsWith("…")) return;
+    const key = `${phrase.toLowerCase()}|${category}`;
+    if (seen.has(key) || !containsPhrase(text, phrase)) return;
+    seen.add(key);
+    out.push({ text: phrase, category, severity });
+  };
+  for (const s of signals) {
+    tryAdd(
+      s.evidence.replace(/^[“”"']+/, "").replace(/[“”"']+$/, ""),
+      s.category,
+      signalSeverity(s.weight),
+    );
+  }
+  for (const h of extras) tryAdd(h.text, h.category, h.severity);
+  return out.slice(0, 14);
+}
+
 export function analyzeHeuristics(content: string, kind: MessageKind): AnalysisResult {
   const text = content;
   const flags: ScamFlag[] = [];
 
+  const extraHighlights: Highlight[] = [];
   for (const rule of RULES) {
     const m = rule.pattern.exec(text);
-    if (m) {
-      flags.push({
-        title: rule.title,
-        evidence: `“${snippet(m[0])}”`,
-        inference: rule.inference,
-        weight: rule.weight,
-        category: rule.category,
-      });
+    if (!m) continue;
+    flags.push({
+      title: rule.title,
+      evidence: `“${snippet(m[0])}”`,
+      inference: rule.inference,
+      weight: rule.weight,
+      category: rule.category,
+    });
+    // Later matches of the same rule feed the highlighter only — they never add score.
+    const global = new RegExp(
+      rule.pattern.source,
+      rule.pattern.flags.includes("g") ? rule.pattern.flags : `${rule.pattern.flags}g`,
+    );
+    const seenPhrases = new Set<string>([m[0].trim().toLowerCase()]);
+    let extra = 0;
+    for (const g of text.matchAll(global)) {
+      if (extra >= 2) break;
+      const phrase = g[0].trim();
+      if (!phrase || seenPhrases.has(phrase.toLowerCase())) continue;
+      seenPhrases.add(phrase.toLowerCase());
+      extraHighlights.push({ text: phrase, category: rule.category, severity: signalSeverity(rule.weight) });
+      extra += 1;
     }
   }
 
@@ -505,6 +576,7 @@ export function analyzeHeuristics(content: string, kind: MessageKind): AnalysisR
     confidence: confidenceFor(risk_level, signals.length, maxWeight),
     explanation,
     signals,
+    highlights: buildHighlights(text, signals, extraHighlights),
     extracted_urls,
     recommended_actions,
     claimed_organization,
@@ -592,6 +664,7 @@ function mergeVerdicts(rules: AnalysisResult, ai: AnalysisResult): AnalysisResul
     risk_level,
     confidence,
     signals,
+    highlights: rules.highlights,
     explanation: elevated ? rules.explanation : ai.explanation?.trim() ? ai.explanation : rules.explanation,
     recommended_actions: [...new Set([...ai.recommended_actions, ...rules.recommended_actions])].slice(0, 6),
     extracted_urls: [...new Set([...ai.extracted_urls, ...rules.extracted_urls])].slice(0, 10),
@@ -599,6 +672,7 @@ function mergeVerdicts(rules: AnalysisResult, ai: AnalysisResult): AnalysisResul
     source: "ai",
     scanned_url: rules.scanned_url ?? ai.scanned_url,
     page_title: rules.page_title ?? ai.page_title,
+    extracted_text: ai.extracted_text ?? rules.extracted_text,
     note: elevated
       ? "The rule engine found stronger indicators than the AI did — the more cautious level is shown."
       : agree
@@ -850,6 +924,7 @@ export async function analyzeUrlMessage(rawUrl: string): Promise<AnalysisResult>
     confidence: confidenceFor(risk_level, signals.length, signals[0]?.weight ?? 0),
     explanation,
     signals,
+    highlights: buildHighlights(shape.normalized, signals),
     extracted_urls: [shape.normalized],
     recommended_actions: recommended_actions.slice(0, 6),
     claimed_organization: detectClaimedOrganization(page?.text ?? "", shape.host),
@@ -929,6 +1004,7 @@ export async function analyzeImage(dataUrl: string): Promise<AnalysisResult> {
     confidence: 0,
     explanation: "No verdict could be read from the screenshot.",
     signals: [],
+    highlights: [],
     extracted_urls: [],
     recommended_actions: [
       "Don't act on the message until you've verified it through an official channel.",
@@ -937,10 +1013,10 @@ export async function analyzeImage(dataUrl: string): Promise<AnalysisResult> {
     claimed_organization: null,
     source: "ai",
   };
-  const aiResult = mapAiResult(parsed, fallback);
+  const extractedText = typeof parsed.extracted_text === "string" ? parsed.extracted_text.trim() : "";
+  const aiResult = { ...mapAiResult(parsed, fallback), extracted_text: extractedText || undefined };
 
   // RULE ENGINE pass: re-run detectors on the text the vision model extracted.
-  const extractedText = typeof parsed.extracted_text === "string" ? parsed.extracted_text.trim() : "";
   if (extractedText.length >= 40) {
     const rules = analyzeHeuristics(extractedText.slice(0, 4000), "email");
     return mergeVerdicts(rules, aiResult);

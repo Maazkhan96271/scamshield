@@ -161,7 +161,7 @@ export default function Home() {
               <div className="mt-4">
                 <div className="flex items-center justify-between font-mono text-[11px] uppercase tracking-widest text-muted">
                   <span>Confidence</span>
-                  <span className="text-danger">91%</span>
+                  <span className="text-danger">High</span>
                 </div>
                 <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
                   <div className="h-full w-[91%] rounded-full bg-accent" />
